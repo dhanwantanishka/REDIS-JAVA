@@ -36,7 +36,8 @@ public class Main {
                 // Parse RESP protocol and handle commands
                 String response = processCommand(line, reader);
                 if (response != null) {
-                    writer.println(response);
+                    writer.print(response);
+                    writer.flush();
                     System.err.println("Sent: " + response);
                 }
             }
