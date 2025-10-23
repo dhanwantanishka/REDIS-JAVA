@@ -1,92 +1,46 @@
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
 
 public class Main {
-    
     public static void main(String[] args) {
-        // You can use print statements as follows for debugging, they'll be visible when running
-        // tests.
-        System.err.println("Logs from your program will appear here!");
-        
-        try (ServerSocket serverSocket = new ServerSocket(6379)) {
-            System.err.println("Redis server listening on port 6379");
-            
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.err.println("Client connected: " + clientSocket.getRemoteSocketAddress());
-                
-                // Handle client in a separate thread
-                new Thread(() -> handleClient(clientSocket)).start();
-            }
-        } catch (IOException e) {
-            System.err.println("Error starting server: " + e.getMessage());
-            e.printStackTrace();
+        if (args.length != 2 || !args[0].equals("-E")) {
+            System.out.println("Usage: ./your_program.sh -E <pattern>");
+            System.exit(1);
+        }
+
+        List<String> test = new ArrayList<>();
+
+        String pattern = args[1];
+        Scanner scanner = new Scanner(System.in);
+        String inputLine = scanner.nextLine();
+
+        if (handlePattern(inputLine, pattern)) {
+            System.exit(0);
+        } else {
+            System.exit(1);
         }
     }
-    
-    private static void handleClient(Socket clientSocket) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-             PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)) {
-            
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.err.println("Received: " + line);
-                
-                // Parse RESP protocol and handle commands
-                String response = processCommand(line, reader);
-                if (response != null) {
-                    writer.print(response);
-                    writer.flush();
-                    System.err.println("Sent: " + response);
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error handling client: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                System.err.println("Error closing client socket: " + e.getMessage());
-            }
+
+    public static boolean handlePattern(String inputLine, String pattern) {
+
+        if (pattern.equals("\\d")) {
+            return handleDigitalCharacterClass(inputLine);
         }
+        if (pattern.length() == 1) {
+            return handleSingleLetterPattern(inputLine, pattern);
+        }
+
+        throw new RuntimeException("Unhandled pattern: " + pattern);
     }
-    
-    private static String processCommand(String line, BufferedReader reader) throws IOException {
-        // Simple RESP parser for basic commands
-        if (line.startsWith("*")) {
-            // Array of bulk strings
-            int arrayLength = Integer.parseInt(line.substring(1));
-            List<String> command = new ArrayList<>();
-            
-            for (int i = 0; i < arrayLength; i++) {
-                // Read bulk string length
-                String bulkStringLength = reader.readLine();
-                if (bulkStringLength.startsWith("$")) {
-                    // Read the actual string
-                    String value = reader.readLine();
-                    command.add(value);
-                }
-            }
-            
-            if (command.size() > 0) {
-                String cmd = command.get(0).toUpperCase();
-                
-                switch (cmd) {
-                    case "ECHO":
-                        if (command.size() >= 2) {
-                            return "$" + command.get(1).length() + "\r\n" + command.get(1) + "\r\n";
-                        }
-                        break;
-                    case "PING":
-                        return "+PONG\r\n";
-                    default:
-                        return "-ERR unknown command '" + cmd + "'\r\n";
-                }
-            }
-        }
-        
-        return null;
+
+    public static boolean handleDigitalCharacterClass(String inputLine) {
+        final List<String> digits = Arrays.asList("0", "1", "2", "3", "4", "5", "6", "7", "8", "9");
+        return digits.stream().anyMatch(inputLine::contains);
+    }
+
+    public static boolean handleSingleLetterPattern(String inputLine, String pattern) {
+        return inputLine.contains(pattern);
     }
 }
