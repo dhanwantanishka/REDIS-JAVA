@@ -29,13 +29,18 @@ public class Main {
         
         // Parse arguments
         for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
+            String opt = args[i].toLowerCase();
+            switch (opt) {
                 case "--port":
+                case "-p":
+                case "port":
                     if (i + 1 < args.length) {
                         port = Integer.parseInt(args[++i]);
                     }
                     break;
                 case "--replicaof":
+                case "-replicaof":
+                case "replicaof":
                     if (i + 2 < args.length) {
                         serverRole = "slave";
                         masterHost = args[++i];
@@ -43,11 +48,15 @@ public class Main {
                     }
                     break;
                 case "--dir":
+                case "-dir":
+                case "dir":
                     if (i + 1 < args.length) {
                         rdbDir = args[++i];
                     }
                     break;
                 case "--dbfilename":
+                case "-dbfilename":
+                case "dbfilename":
                     if (i + 1 < args.length) {
                         rdbFilename = args[++i];
                     }

@@ -1,14 +1,15 @@
 package command;
 
+import handler.ReplicationManager;
+
 import java.io.OutputStream;
 
 public class InfoCommand implements Command {
-    private final String serverRole;
     private final String masterReplId;
     private final Integer masterReplOffset;
 
     public InfoCommand(String serverRole, String masterReplId, Integer masterReplOffset) {
-        this.serverRole = serverRole;
+        // Retain constructor signature for registry compatibility, but ignore serverRole here
         this.masterReplId = masterReplId;
         this.masterReplOffset = masterReplOffset;
     }
@@ -24,12 +25,13 @@ public class InfoCommand implements Command {
         String section = parts[1].toLowerCase();
 
         if (section.equals("replication")) {
+            String currentRole = ReplicationManager.getInstance().getServerRole();
             StringBuilder info = new StringBuilder();
             info.append("# Replication\r\n");
-            info.append("role:").append(serverRole).append("\r\n");
+            info.append("role:").append(currentRole).append("\r\n");
             
             // Only include master_replid and master_repl_offset if this is a master
-            if ("master".equals(serverRole) && masterReplId != null) {
+            if ("master".equals(currentRole) && masterReplId != null) {
                 info.append("master_replid:").append(masterReplId).append("\r\n");
                 info.append("master_repl_offset:").append(masterReplOffset).append("\r\n");
             }
