@@ -4,6 +4,7 @@ import handler.ReplicaHandshake;
 import command.CommandRegistry;
 import storage.RedisStore;
 import storage.RDBReader;
+import java.security.SecureRandom;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -207,6 +208,16 @@ public class Main {
         ReplicationManager replicationManager = ReplicationManager.getInstance();
         replicationManager.setServerRole(serverRole);
         
+        // Initialize master replication ID and offset
+        if ("master".equals(serverRole)) {
+            if (masterReplId == null || masterReplId.isEmpty()) {
+                masterReplId = generateReplicationId();
+            }
+            if (masterReplOffset == null) {
+                masterReplOffset = 0;
+            }
+        }
+
         // Load RDB file if it exists
         boolean rdbLoaded = RDBReader.loadFromFile(rdbDir, rdbFilename, store);
         if (rdbLoaded) {
@@ -276,5 +287,16 @@ public class Main {
             System.err.println("Failed to start server on port " + port + ": " + e.getMessage());
             System.exit(1);
         }
+    }
+
+    private static String generateReplicationId() {
+        // Generate 40-char lowercase hex string (20 random bytes)
+        byte[] bytes = new byte[20];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder(40);
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 }
