@@ -39,6 +39,9 @@ public class CommandRegistry {
         commands.put("XREAD", new XReadCommand(store));
         commands.put("KEYS", new KeysCommand(store));
         
+        // Pub/Sub commands
+        commands.put("SUBSCRIBE", new SubscribeCommand());
+        
         // Replication synchronization
         commands.put("WAIT", new WaitCommand());
     }
