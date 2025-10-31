@@ -41,6 +41,7 @@ public class CommandRegistry {
         
         // Pub/Sub commands
         commands.put("SUBSCRIBE", new SubscribeCommand());
+        commands.put("PUBLISH", new PublishCommand());
         
         // Replication synchronization
         commands.put("WAIT", new WaitCommand());
