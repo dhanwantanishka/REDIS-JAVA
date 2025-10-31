@@ -3,28 +3,32 @@ package handler;
 import command.Command;
 import command.CommandRegistry;
 
+import protocol.RESPWriter;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import protocol.RESPWriter;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final CommandRegistry commandRegistry;
     private final TransactionManager transactionManager;
     private boolean isReplicaConnection = false; // Set to true after PSYNC
-    private final Set<String> subscribedChannels = new HashSet<>();
+
+    // Use synchronized set to avoid concurrency issues if needed; else synchronized explicitly
+    private final Set<String> subscribedChannels = Collections.synchronizedSet(new HashSet<>());
 
     public ClientHandler(Socket clientSocket, CommandRegistry commandRegistry) {
         this.clientSocket = clientSocket;
         this.commandRegistry = commandRegistry;
         this.transactionManager = new TransactionManager(commandRegistry);
     }
-    
+
     /**
      * Mark this connection as a replica connection (after PSYNC).
      * Commands from replica connections should not send responses.
@@ -32,43 +36,53 @@ public class ClientHandler implements Runnable {
     public void markAsReplicaConnection() {
         this.isReplicaConnection = true;
     }
-    
+
     public boolean isReplicaConnection() {
         return isReplicaConnection;
     }
-    
+
+    // Subscribe channel; only adds if not present; returns total count
     public int subscribeChannel(String channel) {
-        // Add only if not present; return current count
         subscribedChannels.add(channel);
         return subscribedChannels.size();
     }
 
+    // Unsubscribe channel; removes if present; returns total count after removal
+    public int unsubscribeChannel(String channel) {
+        subscribedChannels.remove(channel);
+        return subscribedChannels.size();
+    }
+
+    // Returns a thread-safe unmodifiable view of subscribed channels
+    public Set<String> getChannels() {
+        synchronized (subscribedChannels) {
+            return Collections.unmodifiableSet(new HashSet<>(subscribedChannels));
+        }
+    }
+
     @Override
     public void run() {
-        try (clientSocket;
-             OutputStream outputStream = clientSocket.getOutputStream();
-             BufferedReader in = new BufferedReader(
-                     new InputStreamReader(clientSocket.getInputStream()))) {
+        try (
+            clientSocket;
+            OutputStream outputStream = clientSocket.getOutputStream();
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))
+        ) {
 
             String line;
             while ((line = in.readLine()) != null) {
                 if (!line.startsWith("*")) continue;
 
-                // Re-position reader to include the line we just read
                 String[] parts = parseLine(line, in);
-                
                 if (parts == null || parts.length == 0 || parts[0] == null) {
                     continue;
                 }
 
                 String commandName = parts[0].toUpperCase();
-                
-                // Check if this is a REPLCONF ACK response from a replica
+
+                // Handle REPLCONF ACK from replicas
                 if (commandName.equals("REPLCONF") && parts.length >= 3 && parts[1].equalsIgnoreCase("ACK")) {
-                    // This is a replica responding to GETACK
                     try {
                         int reportedOffset = Integer.parseInt(parts[2]);
-                        // Find the replica connection for this socket and complete its ACK future
                         for (ReplicaConnection r : ReplicationManager.getInstance().getReplicas()) {
                             if (r.getSocket() == clientSocket) {
                                 r.completeAck(reportedOffset);
@@ -79,20 +93,19 @@ public class ClientHandler implements Runnable {
                     } catch (NumberFormatException e) {
                         System.err.println("Invalid offset in REPLCONF ACK: " + parts[2]);
                     }
-                    continue; // Don't process this as a normal command
+                    continue; // Skip normal processing
                 }
-                
-                // Enforce subscribed mode: allow SUBSCRIBE and PING with special response
+
+                // Enforce subscribed mode: allow only SUBSCRIBE, UNSUBSCRIBE, PING commands
                 if (!subscribedChannels.isEmpty()) {
                     if (commandName.equals("PING")) {
-                        // Pub/Sub PING response: ["pong", <message?>]
                         String message = parts.length >= 2 ? parts[1] : "";
                         RESPWriter.writeArrayHeader(outputStream, 2);
                         RESPWriter.writeBulkString(outputStream, "pong");
                         RESPWriter.writeBulkString(outputStream, message);
                         continue;
                     }
-                    if (!commandName.equals("SUBSCRIBE")) {
+                    if (!commandName.equals("SUBSCRIBE") && !commandName.equals("UNSUBSCRIBE")) {
                         String err = String.format(
                             "-ERR Can't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING allowed in this context\r\n",
                             commandName.toLowerCase()
@@ -103,32 +116,28 @@ public class ClientHandler implements Runnable {
                     }
                 }
 
-                // Use NullOutputStream for replica connections (master sending commands)
                 OutputStream responseStream = isReplicaConnection ? new NullOutputStream() : outputStream;
-                
-                // Handle transaction commands
+
                 if (commandName.equals("MULTI")) {
                     transactionManager.handleMulti(responseStream);
                     continue;
                 }
-                
+
                 if (commandName.equals("EXEC")) {
                     transactionManager.handleExec(responseStream);
                     continue;
                 }
-                
+
                 if (commandName.equals("DISCARD")) {
                     transactionManager.handleDiscard(responseStream);
                     continue;
                 }
-                
-                // If in transaction, queue the command
+
                 if (transactionManager.isInTransaction()) {
                     transactionManager.queueCommand(parts, responseStream);
                     continue;
                 }
-                
-                // Normal command execution
+
                 Command command = commandRegistry.getCommand(commandName);
 
                 if (command != null) {
@@ -150,7 +159,13 @@ public class ClientHandler implements Runnable {
     }
 
     private String[] parseLine(String firstLine, BufferedReader in) throws IOException {
-        int arrayCount = Integer.parseInt(firstLine.substring(1));
+        int arrayCount;
+        try {
+            arrayCount = Integer.parseInt(firstLine.substring(1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
         String[] parts = new String[arrayCount];
 
         for (int i = 0; i < parts.length; i++) {
