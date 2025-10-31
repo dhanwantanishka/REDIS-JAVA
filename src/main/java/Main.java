@@ -55,6 +55,28 @@ public class Main {
             }
         }
         
+        // Environment variable fallback for replica configuration
+        // This helps in environments that provide replica configuration via env vars
+        if ("master".equals(serverRole)) {
+            String envMasterHost =
+                System.getenv("REPLICAOF_HOST") != null ? System.getenv("REPLICAOF_HOST") :
+                System.getenv("REPLICA_OF_HOST") != null ? System.getenv("REPLICA_OF_HOST") :
+                System.getenv("MASTER_HOST");
+            String envMasterPort =
+                System.getenv("REPLICAOF_PORT") != null ? System.getenv("REPLICAOF_PORT") :
+                System.getenv("REPLICA_OF_PORT") != null ? System.getenv("REPLICA_OF_PORT") :
+                System.getenv("MASTER_PORT");
+            if (envMasterHost != null && envMasterPort != null) {
+                try {
+                    masterHost = envMasterHost;
+                    masterPort = Integer.parseInt(envMasterPort);
+                    serverRole = "slave";
+                } catch (NumberFormatException ignored) {
+                    // If port isn't a valid number, ignore env fallback
+                }
+            }
+        }
+
         System.out.println("Starting Redis server...");
         System.out.println("Port: " + port);
         System.out.println("Role: " + serverRole);
@@ -84,19 +106,19 @@ public class Main {
         
         // If this is a replica, connect to master first
         if (serverRole.equals("slave") && masterHost != null) {
-            connectToMaster(masterHost, masterPort, commandRegistry);
+            connectToMaster(masterHost, masterPort, port, commandRegistry);
         }
         
         // Start the server
         startServer(port, commandRegistry);
     }
     
-    private static void connectToMaster(String masterHost, int masterPort, CommandRegistry commandRegistry) {
+    private static void connectToMaster(String masterHost, int masterPort, int localPort, CommandRegistry commandRegistry) {
         try {
             System.out.println("Connecting to master " + masterHost + ":" + masterPort);
             
             // Perform replica handshake
-            ReplicaHandshake handshake = new ReplicaHandshake(masterHost, masterPort, DEFAULT_PORT, commandRegistry);
+            ReplicaHandshake handshake = new ReplicaHandshake(masterHost, masterPort, localPort, commandRegistry);
             
             // Start handshake in a separate thread since it blocks
             Thread replicaThread = new Thread(() -> {

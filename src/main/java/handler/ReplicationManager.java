@@ -28,6 +28,10 @@ public class ReplicationManager {
         System.out.println("ReplicationManager: Server role set to " + role);
     }
     
+    public String getServerRole() {
+        return serverRole;
+    }
+    
     /**
      * Register a new replica connection after successful handshake
      */
