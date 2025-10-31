@@ -81,6 +81,16 @@ public class ClientHandler implements Runnable {
                     continue; // Don't process this as a normal command
                 }
                 
+                // Enforce subscribed mode: only allow SUBSCRIBE (and later UNSUBSCRIBE/PING) when subscribed
+                if (!subscribedChannels.isEmpty()) {
+                    boolean allowed = commandName.equals("SUBSCRIBE");
+                    if (!allowed) {
+                        outputStream.write("-ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING allowed in this context\r\n".getBytes());
+                        outputStream.flush();
+                        continue;
+                    }
+                }
+
                 // Use NullOutputStream for replica connections (master sending commands)
                 OutputStream responseStream = isReplicaConnection ? new NullOutputStream() : outputStream;
                 
