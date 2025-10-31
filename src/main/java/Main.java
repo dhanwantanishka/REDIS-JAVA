@@ -29,7 +29,8 @@ public class Main {
         
         // Parse arguments
         for (int i = 0; i < args.length; i++) {
-            String opt = args[i].toLowerCase();
+            String rawOpt = args[i];
+            String opt = rawOpt.toLowerCase();
             switch (opt) {
                 case "--port":
                 case "-p":
@@ -41,12 +42,52 @@ public class Main {
                 case "--replicaof":
                 case "-replicaof":
                 case "replicaof":
-                    if (i + 2 < args.length) {
-                        serverRole = "slave";
-                        masterHost = args[++i];
-                        masterPort = Integer.parseInt(args[++i]);
+                {
+                    // Forms supported:
+                    //   --replicaof HOST PORT
+                    //   --replicaof HOST:PORT
+                    //   --replicaof=HOST PORT
+                    //   --replicaof=HOST:PORT
+                    String value = null;
+                    if (rawOpt.contains("=")) {
+                        value = rawOpt.substring(rawOpt.indexOf('=') + 1);
+                    } else if (i + 1 < args.length) {
+                        // Peek next token(s)
+                        String next = args[++i];
+                        // If the next token contains a colon, it's HOST:PORT; otherwise, expect another token as PORT
+                        if (next.contains(":")) {
+                            value = next;
+                        } else {
+                            if (i + 1 < args.length) {
+                                value = next + " " + args[++i];
+                            } else {
+                                // Not enough args; ignore
+                                break;
+                            }
+                        }
+                    }
+                    if (value != null) {
+                        String hostCandidate;
+                        String portCandidate;
+                        if (value.contains(":")) {
+                            String[] hp = value.split(":", 2);
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        } else {
+                            String[] hp = value.trim().split("\\s+", 2);
+                            if (hp.length < 2) break;
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        }
+                        try {
+                            masterHost = hostCandidate;
+                            masterPort = Integer.parseInt(portCandidate);
+                            serverRole = "slave";
+                        } catch (NumberFormatException ignored) {
+                        }
                     }
                     break;
+                }
                 case "--dir":
                 case "-dir":
                 case "dir":
