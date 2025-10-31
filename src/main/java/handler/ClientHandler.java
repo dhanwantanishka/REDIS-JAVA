@@ -8,12 +8,15 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final CommandRegistry commandRegistry;
     private final TransactionManager transactionManager;
     private boolean isReplicaConnection = false; // Set to true after PSYNC
+    private final Set<String> subscribedChannels = new HashSet<>();
 
     public ClientHandler(Socket clientSocket, CommandRegistry commandRegistry) {
         this.clientSocket = clientSocket;
@@ -31,6 +34,12 @@ public class ClientHandler implements Runnable {
     
     public boolean isReplicaConnection() {
         return isReplicaConnection;
+    }
+    
+    public int subscribeChannel(String channel) {
+        // Add only if not present; return current count
+        subscribedChannels.add(channel);
+        return subscribedChannels.size();
     }
 
     @Override
