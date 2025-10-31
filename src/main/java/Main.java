@@ -105,6 +105,56 @@ public class Main {
             }
         }
         
+        // Extra robust scan for replica config if not detected above
+        if ("master".equals(serverRole)) {
+            for (int i = 0; i < args.length; i++) {
+                String token = args[i];
+                if (token == null) continue;
+                String normalized = token.toLowerCase()
+                        .replace('\u2013', '-') // en dash
+                        .replace('\u2014', '-') // em dash
+                        .replace('\u2212', '-') // minus sign
+                        .trim();
+                String bare = normalized.replaceFirst("^-+", "");
+                if (bare.startsWith("replicaof")) {
+                    String value = null;
+                    if (token.contains("=")) {
+                        value = token.substring(token.indexOf('=') + 1);
+                    } else {
+                        // Try HOST:PORT in next token or HOST then PORT
+                        if (i + 1 < args.length) {
+                            String next = args[i + 1];
+                            if (next != null && next.contains(":")) {
+                                value = next;
+                            } else if (i + 2 < args.length) {
+                                value = next + " " + args[i + 2];
+                            }
+                        }
+                    }
+                    if (value != null) {
+                        String hostCandidate;
+                        String portCandidate;
+                        if (value.contains(":")) {
+                            String[] hp = value.split(":", 2);
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        } else {
+                            String[] hp = value.trim().split("\\s+", 2);
+                            if (hp.length < 2) break;
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        }
+                        try {
+                            masterHost = hostCandidate;
+                            masterPort = Integer.parseInt(portCandidate);
+                            serverRole = "slave";
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    break;
+                }
+            }
+        }
+
         // Environment variable fallback for replica configuration
         // This helps in environments that provide replica configuration via env vars
         if ("master".equals(serverRole)) {
