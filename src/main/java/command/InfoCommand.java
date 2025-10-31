@@ -30,10 +30,13 @@ public class InfoCommand implements Command {
             info.append("# Replication\r\n");
             info.append("role:").append(currentRole).append("\r\n");
             
-            // Only include master_replid and master_repl_offset if this is a master
-            if ("master".equals(currentRole) && masterReplId != null) {
-                info.append("master_replid:").append(masterReplId).append("\r\n");
-                info.append("master_repl_offset:").append(masterReplOffset).append("\r\n");
+            // Include master fields when role is master
+            if ("master".equals(currentRole)) {
+                if (masterReplId != null) {
+                    info.append("master_replid:").append(masterReplId).append("\r\n");
+                }
+                int offset = (masterReplOffset != null) ? masterReplOffset : 0;
+                info.append("master_repl_offset:").append(offset).append("\r\n");
             }
             
             String infoStr = info.toString();
