@@ -85,7 +85,11 @@ public class ClientHandler implements Runnable {
                 if (!subscribedChannels.isEmpty()) {
                     boolean allowed = commandName.equals("SUBSCRIBE");
                     if (!allowed) {
-                        outputStream.write("-ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING allowed in this context\r\n".getBytes());
+                        String err = String.format(
+                            "-ERR Can't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING allowed in this context\r\n",
+                            commandName.toLowerCase()
+                        );
+                        outputStream.write(err.getBytes());
                         outputStream.flush();
                         continue;
                     }
