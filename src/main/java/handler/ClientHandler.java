@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
+import protocol.RESPWriter;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
@@ -81,10 +82,17 @@ public class ClientHandler implements Runnable {
                     continue; // Don't process this as a normal command
                 }
                 
-                // Enforce subscribed mode: only allow SUBSCRIBE (and later UNSUBSCRIBE/PING) when subscribed
+                // Enforce subscribed mode: allow SUBSCRIBE and PING with special response
                 if (!subscribedChannels.isEmpty()) {
-                    boolean allowed = commandName.equals("SUBSCRIBE");
-                    if (!allowed) {
+                    if (commandName.equals("PING")) {
+                        // Pub/Sub PING response: ["pong", <message?>]
+                        String message = parts.length >= 2 ? parts[1] : "";
+                        RESPWriter.writeArrayHeader(outputStream, 2);
+                        RESPWriter.writeBulkString(outputStream, "pong");
+                        RESPWriter.writeBulkString(outputStream, message);
+                        continue;
+                    }
+                    if (!commandName.equals("SUBSCRIBE")) {
                         String err = String.format(
                             "-ERR Can't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING allowed in this context\r\n",
                             commandName.toLowerCase()
