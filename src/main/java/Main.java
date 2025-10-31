@@ -54,9 +54,13 @@ public class Main {
                     } else if (i + 1 < args.length) {
                         // Peek next token(s)
                         String next = args[++i];
-                        // If the next token contains a colon, it's HOST:PORT; otherwise, expect another token as PORT
+                        // If the next token contains a colon, it's HOST:PORT;
+                        // If it contains a space (quoted "HOST PORT"), split it;
+                        // otherwise, expect another token as PORT
                         if (next.contains(":")) {
                             value = next;
+                        } else if (next.matches(".*\\s+.*")) {
+                            value = next; // Will be split below on whitespace
                         } else {
                             if (i + 1 < args.length) {
                                 value = next + " " + args[++i];
@@ -71,6 +75,11 @@ public class Main {
                         String portCandidate;
                         if (value.contains(":")) {
                             String[] hp = value.split(":", 2);
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        } else if (value.matches(".*\\s+.*")) {
+                            String[] hp = value.trim().split("\\s+", 2);
+                            if (hp.length < 2) break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         } else {
@@ -126,6 +135,8 @@ public class Main {
                             String next = args[i + 1];
                             if (next != null && next.contains(":")) {
                                 value = next;
+                            } else if (next != null && next.matches(".*\\s+.*")) {
+                                value = next; // Quoted "HOST PORT"
                             } else if (i + 2 < args.length) {
                                 value = next + " " + args[i + 2];
                             }
@@ -136,6 +147,11 @@ public class Main {
                         String portCandidate;
                         if (value.contains(":")) {
                             String[] hp = value.split(":", 2);
+                            hostCandidate = hp[0];
+                            portCandidate = hp[1];
+                        } else if (value.matches(".*\\s+.*")) {
+                            String[] hp = value.trim().split("\\s+", 2);
+                            if (hp.length < 2) break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         } else {
