@@ -7,10 +7,12 @@ import java.util.Map;
 public class CommandRegistry {
     private final Map<String, Command> commands = new HashMap<>();
     private final String serverRole;
+    private final RedisStore store;
 
     public CommandRegistry(RedisStore store, String serverRole, String masterReplId, Integer masterReplOffset, 
                           String rdbDir, String rdbFilename) {
         this.serverRole = serverRole;
+        this.store = store;
         // Commands that don't need store
         commands.put("PING", new PingCommand());
         commands.put("ECHO", new EchoCommand());
@@ -38,9 +40,12 @@ public class CommandRegistry {
         commands.put("XRANGE", new XRangeCommand(store));
         commands.put("XREAD", new XReadCommand(store));
         commands.put("KEYS", new KeysCommand(store));
+        commands.put("DEL", new DelCommand(store));
+        commands.put("EXISTS", new ExistsCommand(store));
         
         // Pub/Sub commands
         commands.put("SUBSCRIBE", new SubscribeCommand());
+        commands.put("UNSUBSCRIBE", new UnsubscribeCommand());
         commands.put("PUBLISH", new PublishCommand());
         
         // Replication synchronization
@@ -57,5 +62,13 @@ public class CommandRegistry {
     
     public boolean isMaster() {
         return "master".equals(serverRole);
+    }
+    
+    public RedisStore getStore() {
+        return store;
+    }
+    
+    public java.util.Set<String> getCommandNames() {
+        return commands.keySet();
     }
 }

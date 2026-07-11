@@ -55,6 +55,30 @@ public class RedisStore {
         return keys;
     }
 
+    /**
+     * Delete a key from all stores (string, list, stream).
+     * @return true if the key existed in any store
+     */
+    public boolean delete(String key) {
+        boolean existed = false;
+        if (store.remove(key) != null) existed = true;
+        expiry.remove(key);
+        if (listStore.remove(key) != null) existed = true;
+        if (streamStore.remove(key) != null) existed = true;
+        return existed;
+    }
+
+    /**
+     * Check if a key exists in any store (string, list, stream).
+     * Checks expiry for string keys.
+     */
+    public boolean exists(String key) {
+        if (containsString(key)) return true;
+        if (containsList(key)) return true;
+        if (containsStream(key)) return true;
+        return false;
+    }
+
     public ConcurrentLinkedDeque<String> getList(String key) {
         return listStore.get(key);
     }

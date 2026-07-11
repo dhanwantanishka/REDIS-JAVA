@@ -1,6 +1,7 @@
 import handler.ClientHandler;
 import handler.ReplicationManager;
 import handler.ReplicaHandshake;
+import handler.RedisHttpServer;
 import command.CommandRegistry;
 import storage.RedisStore;
 import storage.RDBReader;
@@ -234,6 +235,15 @@ public class Main {
         // If this is a replica, connect to master first
         if (serverRole.equals("slave") && masterHost != null) {
             connectToMaster(masterHost, masterPort, port, commandRegistry);
+        }
+        
+        // Start the HTTP dashboard server
+        try {
+            RedisHttpServer httpServer = new RedisHttpServer(8080, store, commandRegistry);
+            httpServer.start();
+        } catch (Exception e) {
+            System.err.println("Failed to start HTTP dashboard: " + e.getMessage());
+            System.err.println("Dashboard will not be available, but Redis server will continue.");
         }
         
         // Start the server
