@@ -17,7 +17,7 @@ public class Main {
     private static final int DEFAULT_PORT = 6379;
     private static final String DEFAULT_RDB_DIR = ".";
     private static final String DEFAULT_RDB_FILENAME = "dump.rdb";
-    
+
     public static void main(String[] args) {
         // Parse command line arguments
         String serverRole = "master";
@@ -28,7 +28,7 @@ public class Main {
         String rdbFilename = DEFAULT_RDB_FILENAME;
         String masterReplId = null;
         Integer masterReplOffset = null;
-        
+
         // Parse arguments
         for (int i = 0; i < args.length; i++) {
             String rawOpt = args[i];
@@ -43,13 +43,12 @@ public class Main {
                     break;
                 case "--replicaof":
                 case "-replicaof":
-                case "replicaof":
-                {
+                case "replicaof": {
                     // Forms supported:
-                    //   --replicaof HOST PORT
-                    //   --replicaof HOST:PORT
-                    //   --replicaof=HOST PORT
-                    //   --replicaof=HOST:PORT
+                    // --replicaof HOST PORT
+                    // --replicaof HOST:PORT
+                    // --replicaof=HOST PORT
+                    // --replicaof=HOST:PORT
                     String value = null;
                     if (rawOpt.contains("=")) {
                         value = rawOpt.substring(rawOpt.indexOf('=') + 1);
@@ -81,12 +80,14 @@ public class Main {
                             portCandidate = hp[1];
                         } else if (value.matches(".*\\s+.*")) {
                             String[] hp = value.trim().split("\\s+", 2);
-                            if (hp.length < 2) break;
+                            if (hp.length < 2)
+                                break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         } else {
                             String[] hp = value.trim().split("\\s+", 2);
-                            if (hp.length < 2) break;
+                            if (hp.length < 2)
+                                break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         }
@@ -115,12 +116,13 @@ public class Main {
                     break;
             }
         }
-        
+
         // Extra robust scan for replica config if not detected above
         if ("master".equals(serverRole)) {
             for (int i = 0; i < args.length; i++) {
                 String token = args[i];
-                if (token == null) continue;
+                if (token == null)
+                    continue;
                 String normalized = token.toLowerCase()
                         .replace('\u2013', '-') // en dash
                         .replace('\u2014', '-') // em dash
@@ -153,12 +155,14 @@ public class Main {
                             portCandidate = hp[1];
                         } else if (value.matches(".*\\s+.*")) {
                             String[] hp = value.trim().split("\\s+", 2);
-                            if (hp.length < 2) break;
+                            if (hp.length < 2)
+                                break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         } else {
                             String[] hp = value.trim().split("\\s+", 2);
-                            if (hp.length < 2) break;
+                            if (hp.length < 2)
+                                break;
                             hostCandidate = hp[0];
                             portCandidate = hp[1];
                         }
@@ -166,7 +170,8 @@ public class Main {
                             masterHost = hostCandidate;
                             masterPort = Integer.parseInt(portCandidate);
                             serverRole = "slave";
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                        }
                     }
                     break;
                 }
@@ -176,14 +181,12 @@ public class Main {
         // Environment variable fallback for replica configuration
         // This helps in environments that provide replica configuration via env vars
         if ("master".equals(serverRole)) {
-            String envMasterHost =
-                System.getenv("REPLICAOF_HOST") != null ? System.getenv("REPLICAOF_HOST") :
-                System.getenv("REPLICA_OF_HOST") != null ? System.getenv("REPLICA_OF_HOST") :
-                System.getenv("MASTER_HOST");
-            String envMasterPort =
-                System.getenv("REPLICAOF_PORT") != null ? System.getenv("REPLICAOF_PORT") :
-                System.getenv("REPLICA_OF_PORT") != null ? System.getenv("REPLICA_OF_PORT") :
-                System.getenv("MASTER_PORT");
+            String envMasterHost = System.getenv("REPLICAOF_HOST") != null ? System.getenv("REPLICAOF_HOST")
+                    : System.getenv("REPLICA_OF_HOST") != null ? System.getenv("REPLICA_OF_HOST")
+                            : System.getenv("MASTER_HOST");
+            String envMasterPort = System.getenv("REPLICAOF_PORT") != null ? System.getenv("REPLICAOF_PORT")
+                    : System.getenv("REPLICA_OF_PORT") != null ? System.getenv("REPLICA_OF_PORT")
+                            : System.getenv("MASTER_PORT");
             if (envMasterHost != null && envMasterPort != null) {
                 try {
                     masterHost = envMasterHost;
@@ -203,12 +206,12 @@ public class Main {
         }
         System.out.println("RDB Dir: " + rdbDir);
         System.out.println("RDB Filename: " + rdbFilename);
-        
+
         // Initialize components
         RedisStore store = new RedisStore();
         ReplicationManager replicationManager = ReplicationManager.getInstance();
         replicationManager.setServerRole(serverRole);
-        
+
         // Initialize master replication ID and offset
         if ("master".equals(serverRole)) {
             if (masterReplId == null || masterReplId.isEmpty()) {
@@ -226,37 +229,39 @@ public class Main {
         } else {
             System.out.println("No RDB file found or error loading");
         }
-        
+
         // Initialize command registry
         CommandRegistry commandRegistry = new CommandRegistry(
-            store, serverRole, masterReplId, masterReplOffset, rdbDir, rdbFilename
-        );
-        
+                store, serverRole, masterReplId, masterReplOffset, rdbDir, rdbFilename);
+
         // If this is a replica, connect to master first
         if (serverRole.equals("slave") && masterHost != null) {
             connectToMaster(masterHost, masterPort, port, commandRegistry);
         }
-        
+
         // Start the HTTP dashboard server
         try {
-            RedisHttpServer httpServer = new RedisHttpServer(8080, store, commandRegistry);
+            int httpPort = Integer.parseInt(
+                    System.getenv().getOrDefault("PORT", "8080"));
+            RedisHttpServer httpServer = new RedisHttpServer(httpPort, store, commandRegistry);
             httpServer.start();
         } catch (Exception e) {
             System.err.println("Failed to start HTTP dashboard: " + e.getMessage());
             System.err.println("Dashboard will not be available, but Redis server will continue.");
         }
-        
+
         // Start the server
         startServer(port, commandRegistry);
     }
-    
-    private static void connectToMaster(String masterHost, int masterPort, int localPort, CommandRegistry commandRegistry) {
+
+    private static void connectToMaster(String masterHost, int masterPort, int localPort,
+            CommandRegistry commandRegistry) {
         try {
             System.out.println("Connecting to master " + masterHost + ":" + masterPort);
-            
+
             // Perform replica handshake
             ReplicaHandshake handshake = new ReplicaHandshake(masterHost, masterPort, localPort, commandRegistry);
-            
+
             // Start handshake in a separate thread since it blocks
             Thread replicaThread = new Thread(() -> {
                 try {
@@ -268,24 +273,24 @@ public class Main {
             });
             replicaThread.setDaemon(true);
             replicaThread.start();
-            
+
         } catch (Exception e) {
             System.err.println("Failed to connect to master: " + e.getMessage());
         }
     }
-    
+
     private static void startServer(int port, CommandRegistry commandRegistry) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Redis server listening on port " + port);
-            
+
             // Create thread pool for handling client connections
             ExecutorService executor = Executors.newCachedThreadPool();
-            
+
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     System.out.println("New client connected: " + clientSocket.getRemoteSocketAddress());
-                    
+
                     // Handle each client in a separate thread
                     ClientHandler clientHandler = new ClientHandler(clientSocket, commandRegistry);
                     executor.submit(clientHandler);
